@@ -31,4 +31,9 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'verification' => [
+        'expires_in_minutes' => (int) env('VERIFICATION_CODE_EXPIRES_IN_MINUTES', 10),
+        'code_length' => (int) env('VERIFICATION_CODE_LENGTH', 6),
+    ],
+
 ];

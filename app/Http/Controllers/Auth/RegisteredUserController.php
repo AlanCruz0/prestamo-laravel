@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Mail\VerificationCodeMail;
 use App\Models\User;
+use App\Models\VerificationCode;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rules;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -47,6 +50,43 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect(RouteServiceProvider::HOME);
+        $request->session()->regenerate();
+
+        $this->issueVerificationCode((string) $user->email);
+
+        $request->session()->put([
+            'code_verified' => false,
+            'code_verified_user_id' => (int) $user->id,
+        ]);
+
+        return redirect()->route('code-verification.notice');
+    }
+
+    private function issueVerificationCode(string $email): void
+    {
+        $codeLength = (int) config('services.verification.code_length', 6);
+        $expiresInMinutes = (int) config('services.verification.expires_in_minutes', 10);
+        $code = $this->generateNumericCode($codeLength);
+
+        VerificationCode::query()
+            ->where('email', $email)
+            ->whereNull('used_at')
+            ->update(['used_at' => now()]);
+
+        VerificationCode::query()->create([
+            'email' => $email,
+            'code_hash' => Hash::make($code),
+            'expires_at' => now()->addMinutes($expiresInMinutes),
+        ]);
+
+        Mail::to($email)->send(new VerificationCodeMail($code, $expiresInMinutes));
+    }
+
+    private function generateNumericCode(int $length): string
+    {
+        $min = (int) str_pad('1', $length, '0');
+        $max = (int) str_pad('', $length, '9');
+
+        return (string) random_int($min, $max);
     }
 }
