@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Mail\VerificationCodeMail;
+use App\Rules\NoConsecutiveNumbers;
+use App\Rules\RecaptchaValid;
 use App\Models\User;
 use App\Models\VerificationCode;
 use App\Providers\RouteServiceProvider;
@@ -37,7 +39,8 @@ class RegisteredUserController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'password' => ['required', 'confirmed', Rules\Password::defaults(), new NoConsecutiveNumbers()],
+            'g-recaptcha-response' => ['required', new RecaptchaValid()],
         ]);
 
         $user = User::create([

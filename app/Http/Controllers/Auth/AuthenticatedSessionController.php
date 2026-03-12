@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Mail\VerificationCodeMail;
 use App\Models\VerificationCode;
+use App\Rules\RecaptchaValid;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,6 +35,10 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): RedirectResponse
     {
+        $request->validate([
+            'g-recaptcha-response' => ['required', new RecaptchaValid()],
+        ]);
+
         $request->authenticate();
 
         $request->session()->regenerate();

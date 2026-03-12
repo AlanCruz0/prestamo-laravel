@@ -36,4 +36,10 @@ return [
         'code_length' => (int) env('VERIFICATION_CODE_LENGTH', 6),
     ],
 
+    'recaptcha' => [
+        'public_key' => env('RECAPTCHA_PUBLIC_KEY'),
+        'secret_key' => env('RECAPTCHA_SECRET_KEY'),
+        'skip_verification' => env('RECAPTCHA_SKIP_VERIFICATION', false),
+    ],
+
 ];
