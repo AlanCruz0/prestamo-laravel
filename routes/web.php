@@ -1,4 +1,4 @@
-<?php
+}<?php
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -21,3 +21,4 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'code.verified', 'verified'])->name('dashboard');
 
 require __DIR__.'/auth.php';
+

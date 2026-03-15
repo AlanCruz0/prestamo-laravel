@@ -46,8 +46,8 @@ return [
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DATABASE_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '3306'),
+            'host' => env('DB_HOST', '10.124.0.4'),
+            'port' => env('DB_PORT', '55255'),
             'database' => env('DB_DATABASE', 'forge'),
             'username' => env('DB_USERNAME', 'forge'),
             'password' => env('DB_PASSWORD', ''),
@@ -59,9 +59,10 @@ return [
             'strict' => true,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('DB_SSL_CA'),
-                PDO::MYSQL_ATTR_SSL_CERT => env('DB_SSL_CERT'),
-                PDO::MYSQL_ATTR_SSL_KEY => env('DB_SSL_KEY'),
+                PDO::MYSQL_ATTR_SSL_CA   => env('MYSQL_ATTR_SSL_CA'),
+		PDO::MYSQL_ATTR_SSL_CERT => env('MYSQL_ATTR_SSL_CERT'),
+		PDO::MYSQL_ATTR_SSL_KEY  => env('MYSQL_ATTR_SSL_KEY'),
+		PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => true,
             ]) : [],
         ],
 
