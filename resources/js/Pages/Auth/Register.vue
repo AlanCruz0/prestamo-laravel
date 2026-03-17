@@ -23,6 +23,14 @@ const scriptLoaded = ref(false);
 const recaptchaContainer = ref(null);
 const recaptchaWidgetId = ref(null);
 
+const setRecaptchaToken = (token = '') => {
+    form['g-recaptcha-response'] = token;
+
+    if (token) {
+        form.clearErrors('g-recaptcha-response');
+    }
+};
+
 const loadRecaptcha = () => {
     if (window.grecaptcha && typeof window.grecaptcha.render === 'function') {
         return Promise.resolve(window.grecaptcha);
@@ -60,6 +68,18 @@ const loadRecaptcha = () => {
     return window.__recaptchaLoaderPromise;
 };
 
+const resetRecaptcha = (message = 'Completa reCAPTCHA nuevamente para volver a intentarlo.') => {
+    setRecaptchaToken();
+
+    if (window.grecaptcha && recaptchaWidgetId.value !== null) {
+        window.grecaptcha.reset(recaptchaWidgetId.value);
+    }
+
+    if (message) {
+        form.setError('g-recaptcha-response', message);
+    }
+};
+
 const renderRecaptcha = async () => {
     await nextTick();
 
@@ -69,15 +89,10 @@ const renderRecaptcha = async () => {
 
     recaptchaWidgetId.value = window.grecaptcha.render(recaptchaContainer.value, {
         sitekey: recaptchaPublicKey,
+        callback: (token) => setRecaptchaToken(token),
+        'expired-callback': () => resetRecaptcha('La verificacion expiro. Completa reCAPTCHA nuevamente.'),
+        'error-callback': () => resetRecaptcha('No se pudo validar reCAPTCHA. Intenta nuevamente.'),
     });
-};
-
-const resetRecaptcha = () => {
-    form['g-recaptcha-response'] = '';
-
-    if (window.grecaptcha && recaptchaWidgetId.value !== null) {
-        window.grecaptcha.reset(recaptchaWidgetId.value);
-    }
 };
 
 onMounted(() => {
@@ -87,23 +102,24 @@ onMounted(() => {
             renderRecaptcha();
         })
         .catch(() => {
-            form.errors['g-recaptcha-response'] = 'reCAPTCHA no se cargo correctamente. Intenta recargar la pagina.';
+            form.setError('g-recaptcha-response', 'reCAPTCHA no se cargo correctamente. Intenta recargar la pagina.');
         });
 });
 
 const submit = () => {
     if (!scriptLoaded.value || !window.grecaptcha) {
-        form.errors['g-recaptcha-response'] = 'reCAPTCHA no se cargo correctamente. Intenta recargar la pagina.';
+        form.setError('g-recaptcha-response', 'reCAPTCHA no se cargo correctamente. Intenta recargar la pagina.');
         return;
     }
-    
-    const token = recaptchaWidgetId.value !== null ? window.grecaptcha.getResponse(recaptchaWidgetId.value) : '';
+
+    const token = form['g-recaptcha-response'] || (recaptchaWidgetId.value !== null ? window.grecaptcha.getResponse(recaptchaWidgetId.value) : '');
+
     if (!token) {
-        form.errors['g-recaptcha-response'] = 'Por favor completa la verificacion de reCAPTCHA.';
+        form.setError('g-recaptcha-response', 'Por favor completa la verificacion de reCAPTCHA.');
         return;
     }
-    
-    form['g-recaptcha-response'] = token;
+
+    setRecaptchaToken(token);
     form.post(route('register'), {
         onFinish: () => form.reset('password', 'password_confirmation'),
         onError: () => resetRecaptcha(),

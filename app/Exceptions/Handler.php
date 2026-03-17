@@ -2,9 +2,12 @@
 
 namespace App\Exceptions;
 
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\TransferException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use PDOException;
 use Throwable;
 
@@ -43,6 +46,20 @@ class Handler extends ExceptionHandler
 
             return response()->view('errors.database-unavailable', [], 503);
         });
+
+        $this->renderable(function (Throwable $e, Request $request) {
+            if (! $this->isGatewayTimeoutException($e)) {
+                return null;
+            }
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'El servidor tardó demasiado en responder. Intente nuevamente en unos minutos.',
+                ], 504);
+            }
+
+            return response()->view('errors.504', [], 504);
+        });
     }
 
     /**
@@ -71,6 +88,40 @@ class Handler extends ExceptionHandler
                 $message = strtolower($exception->getMessage());
 
                 foreach ($connectionErrorMarkers as $marker) {
+                    if (str_contains($message, $marker)) {
+                        return true;
+                    }
+                }
+            }
+        } while ($exception = $exception->getPrevious());
+
+        return false;
+    }
+
+    /**
+     * Determine if the exception was caused by an upstream timeout.
+     */
+    protected function isGatewayTimeoutException(Throwable $exception): bool
+    {
+        $timeoutErrorMarkers = [
+            '504 gateway timeout',
+            'connection timed out',
+            'connection timeout',
+            'curl error 28',
+            'gateway timeout',
+            'operation timed out',
+            'timed out',
+        ];
+
+        do {
+            if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() === 504) {
+                return true;
+            }
+
+            if ($exception instanceof ConnectException || $exception instanceof TransferException) {
+                $message = strtolower($exception->getMessage());
+
+                foreach ($timeoutErrorMarkers as $marker) {
                     if (str_contains($message, $marker)) {
                         return true;
                     }
