@@ -37,7 +37,7 @@ class RegisteredUserController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => ['required', 'string', 'min:3', 'max:50', 'not_regex:/[0-9]/'],
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             'password' => ['required', 'confirmed', Rules\Password::defaults(), new NoConsecutiveNumbers()],
             'g-recaptcha-response' => ['required', new RecaptchaValid()],

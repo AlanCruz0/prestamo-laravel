@@ -107,6 +107,18 @@ onMounted(() => {
 });
 
 const submit = () => {
+    form.clearErrors('name');
+
+    if (form.name.trim().length < 3) {
+        form.setError('name', 'El nombre debe tener al menos 3 caracteres.');
+        return;
+    }
+
+    if (/[0-9]/.test(form.name)) {
+        form.setError('name', 'El nombre no puede contener numeros.');
+        return;
+    }
+
     if (!scriptLoaded.value || !window.grecaptcha) {
         form.setError('g-recaptcha-response', 'reCAPTCHA no se cargo correctamente. Intenta recargar la pagina.');
         return;

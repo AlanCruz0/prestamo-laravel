@@ -24,6 +24,8 @@ return [
         'uncompromised' => 'La :attribute ha aparecido en una filtracion de datos. Elige otra diferente.',
     ],
 
+    'not_regex' => 'El campo :attribute contiene caracteres no permitidos.',
+
     'attributes' => [
         'name' => 'nombre',
         'email' => 'correo electronico',
