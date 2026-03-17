@@ -5,7 +5,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 
 const RECAPTCHA_SCRIPT_SELECTOR = 'script[data-recaptcha-script="true"]';
 
@@ -22,6 +22,18 @@ const recaptchaPublicKey = import.meta.env.RECAPTCHA_PUBLIC_KEY || '';
 const scriptLoaded = ref(false);
 const recaptchaContainer = ref(null);
 const recaptchaWidgetId = ref(null);
+
+const passwordRequirements = computed(() => {
+    const p = form.password;
+    return [
+        { label: 'Minimo 8 caracteres',                    met: p.length >= 8 },
+        { label: 'Al menos una letra minuscula',           met: /[a-z]/.test(p) },
+        { label: 'Al menos una letra mayuscula',           met: /[A-Z]/.test(p) },
+        { label: 'Al menos un numero',                     met: /[0-9]/.test(p) },
+        { label: 'Al menos un simbolo (ej. @, #, !)',      met: /[^a-zA-Z0-9]/.test(p) },
+        { label: 'Sin numeros consecutivos (ej. 123)',     met: p.length > 0 && !/(?:(?:0(?=1)|1(?=2)|2(?=3)|3(?=4)|4(?=5)|5(?=6)|6(?=7)|7(?=8)|8(?=9)){2}|(?:9(?=8)|8(?=7)|7(?=6)|6(?=5)|5(?=4)|4(?=3)|3(?=2)|2(?=1)|1(?=0)){2})/.test(p) },
+    ];
+});
 
 const setRecaptchaToken = (token = '') => {
     form['g-recaptcha-response'] = token;
@@ -186,6 +198,18 @@ const submit = () => {
                     required
                     autocomplete="new-password"
                 />
+
+                <ul class="mt-2 space-y-1 text-xs">
+                    <li
+                        v-for="req in passwordRequirements"
+                        :key="req.label"
+                        class="flex items-center gap-1.5"
+                        :class="req.met ? 'text-green-600' : 'text-gray-400'"
+                    >
+                        <span class="text-base leading-none" aria-hidden="true">{{ req.met ? '✓' : '○' }}</span>
+                        {{ req.label }}
+                    </li>
+                </ul>
 
                 <InputError class="mt-2" :message="form.errors.password" />
             </div>
