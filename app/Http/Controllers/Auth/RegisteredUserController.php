@@ -41,6 +41,8 @@ class RegisteredUserController extends Controller
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             'password' => ['required', 'confirmed', Rules\Password::defaults(), new NoConsecutiveNumbers()],
             'g-recaptcha-response' => ['required', new RecaptchaValid()],
+        ], [
+            'email.unique' => 'El correo electronico es invalido.',
         ]);
 
         $user = User::create([
