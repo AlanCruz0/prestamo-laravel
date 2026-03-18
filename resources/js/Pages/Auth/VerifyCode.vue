@@ -23,7 +23,14 @@ const form = useForm({
 
 const resendForm = useForm({});
 
+const CODE_LENGTH = 6;
+
+const sanitizeCode = () => {
+    form.code = form.code.replace(/\D/g, '').slice(0, CODE_LENGTH);
+};
+
 const submit = () => {
+    sanitizeCode();
     form.post(route('code-verification.verify'));
 };
 
@@ -53,8 +60,12 @@ const resend = () => {
                     id="code"
                     type="text"
                     inputmode="numeric"
+                    maxlength="6"
+                    minlength="6"
+                    pattern="[0-9]*"
                     class="mt-1 block w-full"
                     v-model="form.code"
+                    @input="sanitizeCode"
                     required
                     autofocus
                     autocomplete="one-time-code"
