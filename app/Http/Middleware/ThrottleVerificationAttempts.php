@@ -27,8 +27,17 @@ class ThrottleVerificationAttempts
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Usar IP como identificador
-        $key = 'verification-code-'.$request->ip();
+        // Usar email del usuario como identificador
+        $email = $request->user()?->email;
+        
+        if (!$email) {
+            // Si no hay usuario autenticado, rechazar
+            return response()->json([
+                'message' => 'Usuario no autenticado.',
+            ], 401);
+        }
+
+        $key = 'verification-code-'.$email;
 
         // 5 intentos por 10 minutos (600 segundos)
         $maxAttempts = 5;

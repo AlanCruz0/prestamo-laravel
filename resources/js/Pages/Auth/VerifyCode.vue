@@ -217,6 +217,17 @@ onUnmounted(() => {
                     <p class="text-xs text-gray-500 mt-4">
                         Podrás intentar de nuevo cuando el contador llegue a cero.
                     </p>
+
+                    <div class="mt-6">
+                        <Link
+                            :href="route('logout')"
+                            method="post"
+                            as="button"
+                            class="w-full px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-sm text-white hover:bg-red-700 transition ease-in-out duration-150"
+                        >
+                            Cerrar sesión
+                        </Link>
+                    </div>
                 </div>
             </div>
         </div>
