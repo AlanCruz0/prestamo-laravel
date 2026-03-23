@@ -36,7 +36,7 @@ Route::middleware('auth')->group(function () {
                 ->name('code-verification.notice');
 
     Route::post('verify-code', [VerificationCodeController::class, 'submit'])
-                ->middleware('throttle:6,1')
+                ->middleware('throttle.verification')
                 ->name('code-verification.verify');
 
     Route::post('verify-code/resend', [VerificationCodeController::class, 'resend'])

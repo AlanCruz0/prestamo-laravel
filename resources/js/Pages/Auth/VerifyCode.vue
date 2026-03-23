@@ -5,9 +5,8 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { nextTick, onMounted, ref } from 'vue';
-
-const RECAPTCHA_SCRIPT_SELECTOR = 'script[data-recaptcha-script="true"]';
+import { ref, onUnmounted } from 'vue';
+import axios from 'axios';
 
 defineProps({
     email: {
@@ -24,129 +23,82 @@ const form = useForm({
     code: '',
 });
 
-const resendForm = useForm({
-    'g-recaptcha-response': '',
-});
-
-const recaptchaPublicKey = import.meta.env.RECAPTCHA_PUBLIC_KEY || '';
-
-const scriptLoaded = ref(false);
-const recaptchaContainer = ref(null);
-const recaptchaWidgetId = ref(null);
+const resendForm = useForm({});
 
 const CODE_LENGTH = 6;
+
+// Estado del bloqueo
+const isBlocked = ref(false);
+const timeRemaining = ref(0);
+const isProcessing = ref(false);
+let timerInterval = null;
 
 const sanitizeCode = () => {
     form.code = form.code.replace(/\D/g, '').slice(0, CODE_LENGTH);
 };
 
-const setRecaptchaToken = (token = '') => {
-    resendForm['g-recaptcha-response'] = token;
+const startBlockTimer = (seconds) => {
+    isBlocked.value = true;
+    timeRemaining.value = seconds;
 
-    if (token) {
-        resendForm.clearErrors('g-recaptcha-response');
-    }
-};
+    if (timerInterval) clearInterval(timerInterval);
 
-const loadRecaptcha = () => {
-    if (window.grecaptcha && typeof window.grecaptcha.render === 'function') {
-        return Promise.resolve(window.grecaptcha);
-    }
+    timerInterval = setInterval(() => {
+        timeRemaining.value--;
 
-    if (window.__recaptchaLoaderPromise) {
-        return window.__recaptchaLoaderPromise;
-    }
-
-    window.__recaptchaLoaderPromise = new Promise((resolve, reject) => {
-        window.__onRecaptchaLoaded = () => {
-            if (window.grecaptcha && typeof window.grecaptcha.render === 'function') {
-                resolve(window.grecaptcha);
-                return;
-            }
-
-            reject(new Error('reCAPTCHA no pudo inicializarse.'));
-        };
-
-        const existingScript = document.querySelector(RECAPTCHA_SCRIPT_SELECTOR);
-
-        if (existingScript) {
-            return;
+        if (timeRemaining.value <= 0) {
+            clearInterval(timerInterval);
+            isBlocked.value = false;
         }
-
-        const script = document.createElement('script');
-        script.src = 'https://www.google.com/recaptcha/api.js?render=explicit&onload=__onRecaptchaLoaded';
-        script.async = true;
-        script.defer = true;
-        script.dataset.recaptchaScript = 'true';
-        script.onerror = () => reject(new Error('No se pudo cargar el script de reCAPTCHA.'));
-        document.head.appendChild(script);
-    });
-
-    return window.__recaptchaLoaderPromise;
+    }, 1000);
 };
 
-const resetRecaptcha = (message = 'Completa reCAPTCHA nuevamente para volver a intentarlo.') => {
-    setRecaptchaToken();
-
-    if (window.grecaptcha && recaptchaWidgetId.value !== null) {
-        window.grecaptcha.reset(recaptchaWidgetId.value);
-    }
-
-    if (message) {
-        resendForm.setError('g-recaptcha-response', message);
-    }
-};
-
-const renderRecaptcha = async () => {
-    await nextTick();
-
-    if (!scriptLoaded.value || !window.grecaptcha || typeof window.grecaptcha.render !== 'function' || !recaptchaContainer.value || recaptchaWidgetId.value !== null || !recaptchaPublicKey) {
-        return;
-    }
-
-    recaptchaWidgetId.value = window.grecaptcha.render(recaptchaContainer.value, {
-        sitekey: recaptchaPublicKey,
-        callback: (token) => setRecaptchaToken(token),
-        'expired-callback': () => resetRecaptcha('La verificacion expiro. Completa reCAPTCHA nuevamente.'),
-        'error-callback': () => resetRecaptcha('No se pudo validar reCAPTCHA. Intenta nuevamente.'),
-    });
-};
-
-onMounted(() => {
-    loadRecaptcha()
-        .then(() => {
-            scriptLoaded.value = true;
-            renderRecaptcha();
-        })
-        .catch(() => {
-            resendForm.setError('g-recaptcha-response', 'reCAPTCHA no se cargo correctamente. Intenta recargar la pagina.');
-        });
-});
-
-const submit = () => {
+const submit = async () => {
+    if (isProcessing.value) return;
+    
     sanitizeCode();
-    form.post(route('code-verification.verify'));
+    isProcessing.value = true;
+
+    try {
+        const response = await axios.post(route('code-verification.verify'), {
+            code: form.code,
+        }, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        // Si llegamos aquí, fue exitoso
+        window.location.href = route('dashboard');
+    } catch (error) {
+        // Detectar si es un error 429 (Too Many Requests)
+        if (error.response?.status === 429) {
+            const data = error.response?.data;
+            if (data?.retry_after) {
+                startBlockTimer(data.retry_after);
+            }
+            form.clearErrors();
+        } else if (error.response?.status === 422) {
+            // Error de validación
+            const data = error.response?.data;
+            if (data?.errors?.code) {
+                form.setError('code', data.errors.code[0]);
+            }
+        } else {
+            form.setError('code', 'Ocurrió un error. Intenta de nuevo.');
+        }
+    } finally {
+        isProcessing.value = false;
+    }
 };
 
 const resend = () => {
-    if (!scriptLoaded.value || !window.grecaptcha) {
-        resendForm.setError('g-recaptcha-response', 'reCAPTCHA no se cargo correctamente. Intenta recargar la pagina.');
-        return;
-    }
-
-    const token = resendForm['g-recaptcha-response'] || (recaptchaWidgetId.value !== null ? window.grecaptcha.getResponse(recaptchaWidgetId.value) : '');
-
-    if (!token) {
-        resendForm.setError('g-recaptcha-response', 'Por favor completa la verificacion de reCAPTCHA.');
-        return;
-    }
-
-    setRecaptchaToken(token);
-    resendForm.post(route('code-verification.resend'), {
-        onFinish: () => resetRecaptcha(''),
-        onError: () => resetRecaptcha(),
-    });
+    resendForm.post(route('code-verification.resend'));
 };
+
+onUnmounted(() => {
+    if (timerInterval) clearInterval(timerInterval);
+});
 </script>
 
 <template>
@@ -184,16 +136,6 @@ const resend = () => {
                 <InputError class="mt-2" :message="form.errors.code" />
             </div>
 
-            <div class="mt-4 flex justify-center">
-                <div ref="recaptchaContainer"></div>
-            </div>
-
-            <InputError
-                v-if="resendForm.errors['g-recaptcha-response']"
-                class="mt-2"
-                :message="resendForm.errors['g-recaptcha-response']"
-            />
-
             <div class="mt-4 flex items-center justify-between gap-2">
                 <button
                     type="button"
@@ -204,11 +146,42 @@ const resend = () => {
                     Reenviar codigo
                 </button>
 
-                <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
+                <PrimaryButton :class="{ 'opacity-25': isProcessing }" :disabled="isProcessing">
                     Verificar
                 </PrimaryButton>
             </div>
         </form>
+
+        <!-- Modal de bloqueo con timer -->
+        <div v-if="isBlocked" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-8 max-w-sm w-full mx-4 shadow-lg">
+                <div class="text-center">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        Demasiados intentos
+                    </h3>
+
+                    <p class="text-gray-600 mb-6">
+                        Has excedido el límite de intentos. Por favor espera antes de intentar de nuevo.
+                    </p>
+
+                    <div class="mb-6">
+                        <p class="text-4xl font-bold text-blue-600">{{ timeRemaining }}</p>
+                        <p class="text-sm text-gray-500 mt-2">segundos restantes</p>
+                    </div>
+
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                            class="bg-blue-600 h-2 rounded-full transition-all duration-1000"
+                            :style="{ width: (timeRemaining / 600) * 100 + '%' }"
+                        ></div>
+                    </div>
+
+                    <p class="text-xs text-gray-500 mt-4">
+                        Podrás intentar de nuevo cuando el contador llegue a cero.
+                    </p>
+                </div>
+            </div>
+        </div>
 
         <div class="mt-6">
             <Link

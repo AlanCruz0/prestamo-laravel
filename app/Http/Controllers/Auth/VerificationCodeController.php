@@ -7,7 +7,6 @@ use App\Http\Requests\Auth\SendVerificationCodeRequest;
 use App\Http\Requests\Auth\VerifyCodeRequest;
 use App\Mail\VerificationCodeMail;
 use App\Models\VerificationCode;
-use App\Rules\RecaptchaValid;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,10 +28,6 @@ class VerificationCodeController extends Controller
 
     public function resend(Request $request): RedirectResponse
     {
-        $request->validate([
-            'g-recaptcha-response' => ['required', new RecaptchaValid()],
-        ]);
-
         $email = (string) $request->user()->email;
 
         $expiresInMinutes = $this->issueCode($email);

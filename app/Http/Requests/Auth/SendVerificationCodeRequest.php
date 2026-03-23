@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Auth;
 
-use App\Rules\RecaptchaValid;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SendVerificationCodeRequest extends FormRequest
@@ -24,7 +23,6 @@ class SendVerificationCodeRequest extends FormRequest
     {
         return [
             'email' => ['required', 'string', 'email:rfc,dns', 'max:255'],
-            'g-recaptcha-response' => ['required', new RecaptchaValid()],
         ];
     }
 }
