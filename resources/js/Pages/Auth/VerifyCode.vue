@@ -5,7 +5,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { ref, onUnmounted } from 'vue';
+import { ref, onUnmounted, onMounted } from 'vue';
 import axios from 'axios';
 
 defineProps({
@@ -33,13 +33,41 @@ const timeRemaining = ref(0);
 const isProcessing = ref(false);
 let timerInterval = null;
 
+const STORAGE_KEY = 'verification-code-block';
+
 const sanitizeCode = () => {
     form.code = form.code.replace(/\D/g, '').slice(0, CODE_LENGTH);
+};
+
+const saveBlockToStorage = (seconds) => {
+    const expiresAt = Date.now() + seconds * 1000;
+    localStorage.setItem(STORAGE_KEY, expiresAt.toString());
+};
+
+const getBlockFromStorage = () => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return null;
+
+    const expiresAt = parseInt(stored);
+    const now = Date.now();
+
+    if (now >= expiresAt) {
+        localStorage.removeItem(STORAGE_KEY);
+        return null;
+    }
+
+    const remainingSeconds = Math.ceil((expiresAt - now) / 1000);
+    return remainingSeconds;
+};
+
+const clearBlockStorage = () => {
+    localStorage.removeItem(STORAGE_KEY);
 };
 
 const startBlockTimer = (seconds) => {
     isBlocked.value = true;
     timeRemaining.value = seconds;
+    saveBlockToStorage(seconds);
 
     if (timerInterval) clearInterval(timerInterval);
 
@@ -49,6 +77,7 @@ const startBlockTimer = (seconds) => {
         if (timeRemaining.value <= 0) {
             clearInterval(timerInterval);
             isBlocked.value = false;
+            clearBlockStorage();
         }
     }, 1000);
 };
@@ -69,6 +98,7 @@ const submit = async () => {
         });
 
         // Si llegamos aquí, fue exitoso
+        clearBlockStorage();
         window.location.href = route('dashboard');
     } catch (error) {
         // Detectar si es un error 429 (Too Many Requests)
@@ -95,6 +125,14 @@ const submit = async () => {
 const resend = () => {
     resendForm.post(route('code-verification.resend'));
 };
+
+onMounted(() => {
+    // Verificar si hay un bloqueo previo en localStorage
+    const remainingSeconds = getBlockFromStorage();
+    if (remainingSeconds) {
+        startBlockTimer(remainingSeconds);
+    }
+});
 
 onUnmounted(() => {
     if (timerInterval) clearInterval(timerInterval);
